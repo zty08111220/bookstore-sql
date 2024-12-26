@@ -13,16 +13,7 @@ class DBConn:
         else:
             self.book_tb = 'book'
             self.col_book = self.database["book"]
-        '''
-        parent_path = os.path.dirname(os.path.dirname(__file__))
-        self.db_s = os.path.join(parent_path, "data/book.db")
-        self.db_l = os.path.join(parent_path, "data/book_lx.db")
-        large = False
-        if large:
-            self.book_db = self.db_l
-        else:
-            self.book_db = self.db_s
-        '''
+
     def user_id_exist(self, user_id):
         self.conn.execute(
             "SELECT user_id FROM user_ WHERE user_id = %s;", (user_id,)

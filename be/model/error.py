@@ -9,9 +9,9 @@ error_code = {
     517: "stock level low, book id {}",
     518: "invalid order id {}",
     519: "not sufficient funds, order id {}",
-    520: "",
-    521: "",
-    522: "",
+    520: "order time out, order id {}",
+    521: "wrong keyword {}",
+    522: "non exist page {}",
     523: "",
     524: "",
     525: "",
@@ -55,6 +55,15 @@ def error_invalid_order_id(order_id):
 
 def error_not_sufficient_funds(order_id):
     return 519, error_code[518].format(order_id)
+
+def error_order_timeout(order_id):
+    return 520, error_code[520].format(order_id)
+
+def error_wrong_keyword(keyword):
+    return 521, error_code[521].format(keyword)
+
+def error_non_exist_page(page):
+    return 522, error_code[522].format(page)
 
 
 def error_authorization_fail():

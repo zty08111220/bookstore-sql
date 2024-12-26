@@ -50,7 +50,6 @@ def cancel_order():
     code, message = b.cancel_order(user_id, order_id)
     return jsonify({"message": message}), code
 
-'''
 @bp_buyer.route("/receive", methods=["POST"])
 def receive():
     user_id = request.json.get("user_id")
@@ -108,4 +107,3 @@ def history_order():
     b=Buyer()
     code,message,history_order=b.history_order(user_id)
     return jsonify({'message':message,"history_order":history_order}),code
-'''

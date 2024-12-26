@@ -53,7 +53,7 @@ class Seller:
         r = requests.post(url, headers=headers, json=json)
         return r.status_code
     
-    '''
+
     def deliver(self,order_id:str):
         json={
             "user_id":self.seller_id,
@@ -63,4 +63,4 @@ class Seller:
         headers={"token":self.token}
         r=requests.post(url,headers=headers,json=json)
         return r.status_code
-    '''
+

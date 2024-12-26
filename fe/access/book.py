@@ -32,21 +32,59 @@ class Book:
 
 
 class BookDB:
-    def __init__(self, large: bool = False):
+    def __init__(self, large: bool = False):      
         self.database = store.get_nosql_db_conn()
-        '''
+        
+        if large:
+            self.collection_name = "book_lx"
+        else:
+            self.collection_name = "book"
+        
+        self.book_db = self.database[self.collection_name]
+        
+        # 如果集合为空，从 SQLite 导入数据
+        if self.book_db.count_documents({}) == 0:
+            self._import_from_sqlite(large)
+        
+
+    def _import_from_sqlite(self, large: bool):
+        # 从 SQLite 导入数据到 MongoDB
         parent_path = os.path.dirname(os.path.dirname(__file__))
-        self.db_s = os.path.join(parent_path, "data/book.db")
-        self.db_l = os.path.join(parent_path, "data/book_lx.db")
         if large:
-            self.book_db = self.db_l
+            sqlite_db_path = os.path.join(parent_path, "data/book_lx.db")
         else:
-            self.book_db = self.db_s
-        '''
-        if large:
-            self.book_db = self.database["book_lx"]
-        else:
-            self.book_db = self.database["book"]
+            sqlite_db_path = os.path.join(parent_path, "data/book.db")
+        
+        conn = sqlite.connect(sqlite_db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM book")
+        rows = cursor.fetchall()
+        
+        for row in rows:
+            book = {
+                "id": row[0],
+                "title": row[1],
+                "author": row[2],
+                "publisher": row[3],
+                "original_title": row[4],
+                "translator": row[5],
+                "pub_year": row[6],
+                "pages": row[7],
+                "price": row[8],
+                "currency_unit": row[9],
+                "binding": row[10],
+                "isbn": row[11],
+                "author_intro": row[12],
+                "book_intro": row[13],
+                "content": row[14],
+                "tags": row[15],
+                "picture": row[16]
+            }
+            self.book_db.insert_one(book)
+        
+        cursor.close()
+        conn.close()
 
     def get_book_count(self):
         cnt = self.book_db.count_documents({})

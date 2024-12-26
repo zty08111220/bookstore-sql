@@ -30,6 +30,8 @@ class Seller(db_conn.DBConn):
                 "VALUES (%s, %s, %s, %s)",
                 (store_id, book_id, book_json_str, stock_level),
             )
+            
+            logging.info("This is a test log message.")
 
             # decoder=json.JSONDecoder()
             # book_info=decoder.decode(book_json_str)
@@ -86,3 +88,21 @@ class Seller(db_conn.DBConn):
         except BaseException as e:
             return 530, "{}".format(str(e))
         return 200, "ok"
+    
+    def deliver(self,user_id:str,order_id:str):
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+            if not self.his_order_id_exist(order_id):
+                return error.error_invalid_order_id(order_id)
+
+            self.conn.execute("UPDATE history_order SET state='delivering' "
+                                "WHERE order_id = %s AND state='wait for delivery'",
+                                (order_id,)
+                                )
+            self.con.commit()
+        except psycopg2.Error as e:
+            return 528,"{}".format(str(e))
+        except BaseException as e:
+            return 530,"{}".format(str(e))
+        return 200,"ok"

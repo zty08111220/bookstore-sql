@@ -7,6 +7,9 @@ from fe.access.new_seller import register_new_seller
 from fe.access.new_buyer import register_new_buyer
 from fe.access.buyer import Buyer
 from fe import conf
+import os
+logger = logging.getLogger()  # 使用根日志记录器
+
 
 
 class NewOrder:
@@ -78,7 +81,7 @@ class Workload:
         return "store_s_{}_{}_{}".format(seller_no, i, self.uuid)
 
     def gen_database(self):
-        logging.info("load data")
+        #logging.info("load data")
         for i in range(1, self.seller_num + 1):
             user_id, password = self.to_seller_id_and_password(i)
             seller = register_new_seller(user_id, password)
@@ -95,21 +98,21 @@ class Workload:
                     if len(books) == 0:
                         break
                     
-                    logging.info(f"Retrieved {len(books)} books from row {row_no}.")
+                    #logging.info(f"Retrieved {len(books)} books from row {row_no}.")
                     for bk in books:
                         code = seller.add_book(store_id, self.stock_level, bk)
                         assert code == 200
                         # 打印每本书的添加情况
-                        logging.info(f"Added book ID: {bk.id} to Store ID: {store_id}.")
+                        #logging.error(f"Added book ID: {bk.id} to Store ID: {store_id}.")
                         self.book_ids[store_id].append(bk.id)
                     row_no = row_no + len(books)
-        logging.info("seller data loaded.")
+        #logging.info("seller data loaded.")
         for k in range(1, self.buyer_num + 1):
             user_id, password = self.to_buyer_id_and_password(k)
             buyer = register_new_buyer(user_id, password)
             buyer.add_funds(self.user_funds)
             self.buyer_ids.append(user_id)
-        logging.info("buyer data loaded.")
+        #logging.info("buyer data loaded.")
 
     def get_new_order(self) -> NewOrder:
         # 打印每个 store_id 对应的书籍数量
@@ -202,3 +205,4 @@ class Workload:
         self.n_payment_past = self.n_payment
         self.n_new_order_ok_past = self.n_new_order_ok
         self.n_payment_ok_past = self.n_payment_ok
+

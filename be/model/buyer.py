@@ -7,6 +7,7 @@ from be.model import error
 import psycopg2
 import time
 
+SEARCH_PAGE_LENGTH = 5
 
 class Buyer(db_conn.DBConn):
     def __init__(self):
@@ -69,7 +70,7 @@ class Buyer(db_conn.DBConn):
             return 530, "{}".format(str(e)), ""
 
         return 200, "ok", order_id
-
+    '''
     #调用之前需要调用者保证order_id合法
     def order_timeout(self,order_id:str) -> tuple[(int,str)]:
         conn=self.conn
@@ -93,6 +94,7 @@ class Buyer(db_conn.DBConn):
         except BaseException as e:
             return 530, "{}".format(str(e))
         return error.error_order_timeout(order_id)
+    '''
 
     def payment(self, user_id: str, password: str, order_id: str) -> tuple[int, str]:
         conn = self.conn
@@ -112,9 +114,11 @@ class Buyer(db_conn.DBConn):
             if buyer_id != user_id:
                 return error.error_authorization_fail()
             
-            timeout_limit=10 #这里的超时时间设置为1秒，方便调试
+            
+            timeout_limit=1 #这里的超时时间设置为1秒，方便调试
             if order_datetime+timeout_limit<int(time.time()):
                 return self.order_timeout(order_id)
+            
 
             conn.execute(
                 "SELECT balance, password FROM user_ WHERE user_id = %s;", (buyer_id,)
@@ -273,3 +277,148 @@ class Buyer(db_conn.DBConn):
         except BaseException as e:
             return 530, "{}".format(str(e))
         return 200,"ok"
+    
+    def receive(self, user_id: str, order_id: str) -> tuple[(int,str)]:
+        conn = self.conn
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)
+            
+            if not self.his_order_id_exist(order_id):
+                return error.error_invalid_order_id(order_id)
+
+            conn.execute(
+                "UPDATE history_order SET state='received' "
+                "WHERE user_id=%s AND order_id=%s AND state='delivering'",
+                (user_id,order_id)
+            )
+
+            self.con.commit()
+        except psycopg2.Error as e:
+            return 528, "{}".format(str(e))
+        except BaseException as e:
+            return 530, "{}".format(str(e))
+        return 200,"ok"
+    
+    def history_order(self,user_id:str)->tuple[int,str,list[any]]:
+        conn = self.conn
+        try:
+            if not self.user_id_exist(user_id):
+                return error.error_non_exist_user_id(user_id)+([],)
+            sql="""
+                select A.order_id,A.store_id,state,order_datetime,B.book_id,count,price 
+                from history_order as A 
+                join history_order_detail as B on A.order_id=B.order_id
+                join store as C on A.store_id=C.store_id and B.book_id=C.book_id
+                where user_id='{}'""".format(user_id)
+            conn.execute(sql)
+            res = conn.fetchall()
+            
+            self.con.commit()
+        except psycopg2.Error as e:
+            return 528, "{}".format(str(e)),[]
+        except BaseException as e:
+            return 530, "{}".format(str(e)),[]
+        return 200,"ok",res
+    
+    #如果store_id是空字符串，则为全站搜索，否则是特定store搜索
+    def search(self,user_id:str,keyword:str,content:str,store_id:str) -> tuple[(int,str,int)]:
+        conn = self.conn
+        try:
+            self.conn.execute(
+                "UPDATE user_ SET bids = %s WHERE user_id = %s",
+                ('', user_id),
+            )
+            self.con.commit()
+            
+            keys = self.col_book.find_one().keys()
+            if keyword not in keys or keyword == '_id':
+                return error.error_wrong_keyword(keyword)+(-1,)
+            
+            sql = """select distinct book_id from store """
+            if not store_id == "":
+                sql += " where store_id='{}'".format(store_id)
+                if not self.store_id_exist(store_id):
+                    return error.error_non_exist_store_id(store_id)+(-1,)
+            conn.execute(sql)
+            row = conn.fetchall()
+            if row == []:
+                return 200,"ok",0
+            bids = list(map(lambda x:x[0],row))
+            # bids:tuple[str,]=tuple(map(lambda x:x[0],row))
+            # if len(bids) == 1 :
+            #     bids="('"+str(bids[0])+"')"
+            rows = self.col_book.find({'id': {'$in': bids}, keyword: {'$regex':  content}}, 
+                               {'_id': 0, 'id': 1})
+            res = list(map(lambda x:x['id'],rows)) 
+            # search_sql="""select id from {} 
+            #     where id in {} and {} like '%{}%'""".format(book_tb,bids,keyword,content)
+            # conn.execute(search_sql)
+            # row = conn.fetchall()
+            # if row == []:
+            #     return 200,"ok",0
+            # res = list(map(lambda x:x[0],row))
+            bids = ','.join(res)
+            conn.execute(
+                "UPDATE user_ SET bids = %s WHERE user_id = %s",
+                (bids, user_id),
+            )
+            self.con.commit()
+            pages = len(res) // SEARCH_PAGE_LENGTH #结果共几页
+        except psycopg2.Error as e:
+            logging.error(e)
+            return 528, "{}".format(str(e)),-1
+        except mongo_error.PyMongoError as e:
+            logging.error(e)
+            return 529, "{}".format(str(e)),-1
+        except BaseException as e:
+            logging.error(e)
+            return 530, "{}".format(str(e)),-1
+        return 200,"ok",pages
+    
+    def get_book_from_bid(self, user_id: str, have_pic: bool) -> tuple[list[dict]]:
+        res = []
+        if have_pic:
+            content = {'_id': 0}
+        else:
+            content = {'_id': 0, 'picture': 0}
+            
+        self.conn.execute(
+            "select bids from user_ where user_id = %s",
+            (user_id,)
+        )
+        row = self.conn.fetchone()
+        bids = row[0].split(',')
+        col_book = self.col_book
+        rows = col_book.find({'id': {'$in': bids}}, content)
+        res = [row for row in rows]  
+        if have_pic:
+            for row in res:
+                row['picture']=str(row['picture'])
+        return res
+    
+    def next_page(self, user_id: str, page_now: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
+        next_page = page_now + 1
+        if next_page > pages:
+            return error.error_non_exist_page(next_page)+([],page_now,)
+        
+        bids = self.get_book_from_bid(user_id, have_pic)
+        res = bids[next_page * SEARCH_PAGE_LENGTH: (next_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,next_page
+    
+    def pre_page(self, user_id: str, page_now: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
+        pre_page = page_now - 1
+        if pre_page < 0:
+            return error.error_non_exist_page(pre_page)+([],page_now,)
+        
+        bids = self.get_book_from_bid(user_id, have_pic)
+        res = bids[pre_page * SEARCH_PAGE_LENGTH: (pre_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,pre_page
+    
+    def specific_page(self, user_id: str, page_now: int, target_page: int, pages: int, have_pic: bool) -> tuple[int, str, list[dict], int]:
+        if target_page > pages or target_page < 0:
+            return error.error_non_exist_page(target_page)+([],page_now,)
+        
+        bids = self.get_book_from_bid(user_id, have_pic)
+        res = bids[target_page * SEARCH_PAGE_LENGTH: (target_page+1) * SEARCH_PAGE_LENGTH:]
+        return 200,"ok",res,target_page

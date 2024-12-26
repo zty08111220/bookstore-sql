@@ -43,7 +43,7 @@ def add_stock_level():
 
     return jsonify({"message": message}), code
 
-'''
+
 @bp_seller.route("/deliver",methods=['POST'])
 def deliver():
     user_id:str=request.json.get("user_id")
@@ -53,4 +53,3 @@ def deliver():
     code,message=s.deliver(user_id,order_id)
 
     return jsonify({"message":message}) , code
-'''

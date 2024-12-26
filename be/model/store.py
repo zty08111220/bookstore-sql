@@ -17,9 +17,7 @@ class Store:
         password="Tian1226"
         )
         self.database = connect
-        # self.database = os.path.join(db_path, "be.db")
-        # self.book_db=os.path.join(db_path,"book.db")
-        # logging.error(os.path.dirname(__file__))
+
         myclient = pymongo.MongoClient("mongodb://127.0.0.1:27017/")
         self.database2 = myclient["bookstore_db"]
                 

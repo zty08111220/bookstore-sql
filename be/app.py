@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append("C:\\Users\\左庭宇\\Desktop\\bookstore-mysql\\cdms.xuan_zhou.2024fall.dase\\project1\\bookstore")
+sys.path.append("C:\\Users\\左庭宇\\Desktop\\bookstore-mysql\\bookstore")
 
 from be import serve
 
